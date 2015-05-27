@@ -22,22 +22,22 @@ function Note(){
         return self.onMouseDown(e);
     }, false);
     note.addEventListener('click',function(){
-		return self.onNoteClick()
+		return self.onNoteClick();
 	},false);
 	this.note = note;
 
 	var close = document.createElement('div');
 	close.className = 'closebutton';
 	close.addEventListener('click',function(e){
-		return self.close(e)
+		return self.close(e);
 	}, false);
 	note.appendChild(close);
 	
 	var edit = document.createElement('div');
 	edit.className = 'edit';
-	edit.setAttribute('contenteditable', false );
+	edit.setAttribute('contenteditable', true );
 	edit.addEventListener('keyup',function(){
-		return self.OnKeyUp()
+		return self.onKeyUp();
 	}, false);
 	note.appendChild(edit);
 	this.editField = edit;
@@ -45,14 +45,13 @@ function Note(){
 	var ts = document.createElement('div');
 	ts.className = 'timestamp';
 	ts.addEventListener('mousedown',function(e){
-		return self.onMouseDown(e)
+		return self.onMouseDown(e);
 	}, false);
 	note.appendChild(ts);
 	this.lastModified = ts;
 	
 	document.body.appendChild(note);
-	return this
-	
+	return this;
 }
 
 Note.prototype = {
@@ -138,7 +137,7 @@ Note.prototype = {
 		});
 	},
 	saveAsNew: function(){
-		this.timestamp = new Date.getTime();
+		this.timestamp = new Date().getTime();
 		var note = this;
 		db.transaction(function(tx){
 			tx.executeSql("INSERT INTO MyStickys(id, note, timestamp, left, top, zIndex) VALUES(?, ?, ?, ?, ?, ?)",
@@ -153,8 +152,8 @@ Note.prototype = {
 		
 		var self = this;
 		if (!("mouseMoveHandler" in this)) {
-            this.mouseMoveHandler = function(e) { return self.onMouseMove(e) }
-            this.mouseUpHandler = function(e) { return self.onMouseUp(e) }
+            this.mouseMoveHandler = function(e) { return self.onMouseMove(e) };
+            this.mouseUpHandler = function(e) { return self.onMouseUp(e) };
         }
 
         document.addEventListener('mousemove', this.mouseMoveHandler, true);
@@ -184,6 +183,63 @@ Note.prototype = {
         this.dirty = true;
         this.saveSoon();
     },
+};
 
-}
+
 	
+function loaded(){
+    db.transaction(function(tx) {
+        tx.executeSql("SELECT COUNT(*) FROM MyStickys", [], function(result) {
+            loadNotes();
+        }, function(tx, error) {
+            tx.executeSql("CREATE TABLE MyStickys (id REAL UNIQUE, note TEXT, timestamp REAL, left TEXT, top TEXT, zindex REAL)", [], function(result) { 
+                loadNotes(); 
+            });
+        });
+    });
+}
+
+function loadNotes(){
+    db.transaction(function(tx) {
+        tx.executeSql("SELECT id, note, timestamp, left, top, zindex FROM MyStickys", [], function(tx, result) {
+            for (var i = 0; i < result.rows.length; ++i) {
+                var row = result.rows.item(i);
+                var note = new Note();
+                note.id = row['id'];
+                note.text = row['note'];
+                note.timestamp = row['timestamp'];
+                note.left = row['left'];
+                note.top = row['top'];
+                note.zIndex = row['zindex'];
+
+                if (row['id'] > highestId)
+                    highestId = row['id'];
+                if (row['zindex'] > highestZ)
+                    highestZ = row['zindex'];
+            }
+
+            if (!result.rows.length)
+                newNote();
+        }, function(tx, error) {
+            alert('Failed to retrieve notes from database - ' + error.message);
+            return;
+        });
+    });
+}
+
+function modifiedString(date){
+    return 'Note Last Modified: ' + date.getFullYear() + '-' + (date.getMonth() + 1) + '-' + date.getDate() + ' ' + date.getHours() + ':' + date.getMinutes() + ':' + date.getSeconds();
+}
+
+function newNote(){
+    var note = new Note();
+    note.id = ++highestId;
+    note.timestamp = new Date().getTime();
+    note.left = Math.round(Math.random() * 400) + 'px';
+    note.top = Math.round(Math.random() * 500) + 'px';
+    note.zIndex = ++highestZ;
+    note.saveAsNew();
+}
+
+if (db != null)
+    addEventListener('load', loaded, false);
